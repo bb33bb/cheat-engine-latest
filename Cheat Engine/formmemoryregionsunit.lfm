@@ -69,6 +69,7 @@ object FormMemoryRegions: TFormMemoryRegions
     ViewStyle = vsReport
     OnDblClick = ListView1DblClick
     OnResize = ListView1Resize
+    OnColumnClick = ListView1ColumnClick
   end
   object StatusBar1: TStatusBar
     Left = 0

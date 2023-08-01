@@ -45,9 +45,13 @@ type
     procedure Setselectedregionstobewritable1Click(Sender: TObject);
     procedure ListView1DblClick(Sender: TObject);
     procedure PopupMenu1Popup(Sender: TObject);
+    procedure ListView1ColumnClick(Sender: TObject; Column: TListColumn);
   private
     { Private declarations }
     moreinfo: array of tmoreinfo;
+    FSortColumn: Integer;
+    FSortDescending: Boolean;
+    function CompareFunc(Item1, Item2: TListItem; Data: Integer): Integer; stdcall;
   public
     { Public declarations }
   end;
@@ -84,7 +88,11 @@ var GetMappedFileName: TGetMappedFileName;
 implementation
 
 uses formsettingsunit, MemoryBrowserFormUnit, ProcessHandlerUnit;
-
+// This is a regular function that will be used as a proxy for the CompareFunc method
+function CompareFuncProxy(Item1, Item2: TListItem; Data: Integer): Integer; stdcall;
+begin
+  Result := FormMemoryRegions.CompareFunc(Item1, Item2, Data);
+end;
 
 resourcestring
   rsRead = 'Read';
@@ -114,7 +122,7 @@ resourcestring
   rsDoYouWantToUseTheCOPYONWRITEBit = 'Do you want to use the COPY-ON-WRITE bit?';
 
 procedure TFormMemoryRegions.FormShow(Sender: TObject);
-var address: PtrUInt;
+var address: UInt64;
     mbi : _MEMORY_BASIC_INFORMATION;
     temp:string;
     mappedfilename: string;
@@ -150,7 +158,7 @@ begin
       moreinfo[length(moreinfo)-1].isreadable:=(mbi.State=mem_commit) and ((mbi.Protect and page_guard)=0) and ((mbi.protect and page_noaccess)=0);
 
 
-      ListView1.Items.Add.Caption:=IntToHex(PtrUInt(mbi.BaseAddress),8);
+      ListView1.Items.Add.Caption:=IntToHex(PtrUInt(mbi.BaseAddress),16);
 
       temp:='';
       if (PAGE_READONLY and mbi.AllocationProtect)=PAGE_READONLY then temp:=rsRead;
@@ -171,7 +179,7 @@ begin
         MEM_FREE : temp:=rsFree;
         MEM_RESERVE	: temp:=rsReserve;
       end;
-      listview1.Items[listview1.Items.Count-1].SubItems.add(temp);
+      listview1.Items[listview1.Items.Count-1].SubItems.add(inttohex(mbi.regionsize,1));
 
       temp:='';
       if (PAGE_READONLY and mbi.Protect)=PAGE_READONLY then temp:=rsRead;
@@ -233,12 +241,15 @@ begin
 end;
 
 procedure TFormMemoryRegions.FormCreate(Sender: TObject);
-var ci: TListColumn;
+var ci: TListColumn; i: Integer; address:UInt64;
 begin
+  for i := 0 to ListView1.Columns.Count - 1 do
+    ListView1.Columns[i].Tag := i;
   {$ifdef darwin}
   ci:=listview1.Columns.Add;
   ci.Index:=4;
   ci.Caption:='Max Protect';
+  address := StrToInt64('$' + ListView1.Items[i].Caption);
   {$endif}
 end;
 
@@ -251,6 +262,77 @@ procedure TFormMemoryRegions.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
   action:=cafree;
+end;
+
+function HexStrToUInt64(const HexStr: string): UInt64;
+var
+  I: Integer;
+begin
+  Result := 0;
+  for I := 1 to Length(HexStr) do
+  begin
+    Result := Result shl 4;
+    if HexStr[I] in ['0'..'9'] then
+      Result := Result + (Ord(HexStr[I]) - Ord('0'))
+    else if HexStr[I] in ['A'..'F'] then
+      Result := Result + (Ord(HexStr[I]) - Ord('A') + 10)
+    else if HexStr[I] in ['a'..'f'] then
+      Result := Result + (Ord(HexStr[I]) - Ord('a') + 10);
+  end;
+end;
+
+function TFormMemoryRegions.CompareFunc(Item1, Item2: TListItem; Data: Integer): Integer; stdcall;
+var
+  V1, V2: String;
+  N1, N2: UInt64;
+begin
+  if FSortColumn = 0 then
+  begin
+    V1 := Item1.Caption;
+    V2 := Item2.Caption;
+  end
+  else
+  begin
+    V1 := Item1.SubItems[FSortColumn - 1];
+    V2 := Item2.SubItems[FSortColumn - 1];
+  end;
+
+  // Try to convert the strings to numbers
+  if (Length(V1) > 0) and (Length(V2) > 0) then
+  begin
+    N1 := HexStrToUInt64(V1);
+    N2 := HexStrToUInt64(V2);
+
+    // The strings are numbers, compare them as numbers
+    if N1 < N2 then
+      Result := -1
+    else if N1 > N2 then
+      Result := 1
+    else
+      Result := 0;
+  end
+  else
+  begin
+    // The strings are not numbers, compare them as strings
+    Result := CompareStr(V1, V2);
+  end;
+
+  if FSortDescending then
+    Result := -Result;
+end;
+
+
+
+
+procedure TFormMemoryRegions.ListView1ColumnClick(Sender: TObject; Column: TListColumn);
+begin
+  if FSortColumn = Column.Index then
+    FSortDescending := not FSortDescending
+  else
+    FSortDescending := False;
+
+  FSortColumn := Column.Index;
+  ListView1.CustomSort(@CompareFuncProxy, Ord(FSortDescending));
 end;
 
 procedure TFormMemoryRegions.ListView1Resize(Sender: TObject);
@@ -343,11 +425,15 @@ begin
 end;
 
 procedure TFormMemoryRegions.ListView1DblClick(Sender: TObject);
+var
+  address: UInt64;
 begin
 
-  if (listview1.SelCount<>0) then
-    MemoryBrowser.memoryaddress:=moreinfo[listview1.itemindex].address;
-
+  if (listview1.SelCount <> 0) then
+  begin
+    address := HexStrToUInt64(listview1.Selected.Caption);
+    MemoryBrowser.memoryaddress := PtrUInt(address);
+  end;
 end;
 
 procedure TFormMemoryRegions.PopupMenu1Popup(Sender: TObject);
