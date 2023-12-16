@@ -1245,7 +1245,8 @@ begin
     begin
       CodeRecord:=CodeRecords.AppendChild(doc.CreateElement('CodeEntry'));
 
-      if not (TCodeListEntry(advancedoptions.lvCodelist.Items[i].data).color in [clWindowtext,advancedoptions.color,graphics.clDefault])
+      if (TCodeListEntry(advancedoptions.lvCodelist.Items[i].data).color<>clWindowtext) and
+         (TCodeListEntry(advancedoptions.lvCodelist.Items[i].data).color<>graphics.clDefault)
       then //don't save the color if it's the default color
       begin
         a:=doc.CreateAttribute('Color');

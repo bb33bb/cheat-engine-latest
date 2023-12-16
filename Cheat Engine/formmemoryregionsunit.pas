@@ -433,7 +433,7 @@ var
   address: UInt64;
 begin
 
-  if (listview1.SelCount <> 0) then
+  if (listview1.SelCount<>0) then
   begin
     address := HexStrToUInt64(listview1.Selected.Caption);
     MemoryBrowser.memoryaddress := PtrUInt(address);
