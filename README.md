@@ -10,8 +10,12 @@ Cheat Engine is a development environment focused on modding games and applicati
 
 
 # Download
+Personal buil
+arm64-ceserver
+https://github.com/bb33bb/cheat-engine-latest/actions/runs/10551807383
+cheat engine latest
 
-  * **[Latest Version](https://github.com/cheat-engine/cheat-engine/releases/latest)**
+Official [Latest Version](https://github.com/cheat-engine/cheat-engine/releases/latest)**
 
 [Older versions](https://github.com/cheat-engine/cheat-engine/releases)
 
